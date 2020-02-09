@@ -1,0 +1,13 @@
+ansible>=2.8.0
+azure-datalake-store
+python-memcached
+psutil
+pip>=19.1
+netaddr
+pylint
+jsonschema
+molecule
+pre-commit
+docker
+GitPython
+openshift

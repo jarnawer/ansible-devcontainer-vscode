@@ -2,10 +2,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See https://go.microsoft.com/fwlink/?linkid=2090316 for license information.
 #-------------------------------------------------------------------------------------------------------------
-
-# Pick any base image, but if you select node, skip installing node. 😊
-FROM microsoft/ansible
-
+FROM ubuntu:bionic
+LABEL maintainer="@imjoseangel"
 # This Dockerfile adds a non-root user with sudo access. Use the "remoteUser"
 # property in devcontainer.json to use it. On Linux, the container user's GID/UIDs
 # will be updated to match your local UID/GID (when using the dockerFile property).
@@ -14,45 +12,49 @@ ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
-# Configure apt and install packages
-RUN apt-add-repository ppa:ansible/ansible \
-    && apt-get update \
-    && apt-get -y install --no-install-recommends apt-utils dialog 2>&1 \
-    #
-    # Verify git, required tools installed
-    && apt-get install -y \
-        git \
-        iproute2 \
-        curl \
-        procps \
-        unzip \
-        apt-transport-https \
-        ca-certificates \
-        gnupg-agent \
-        software-properties-common \
-        lsb-release 2>&1 \
-        libssl-dev \
-        libffi-dev \
-        python-pip \
-        ansible \
-    # #
-    # Install Ansible
-    # && apt-get install -y libssl-dev libffi-dev python-dev python-pip \
-    && pip install azure-datalake-store \
-    && pip install ansible[azure] \
-    && pip install --user molecule \
-    # #
+# To make it easier for build and release pipelines to run apt-get,
+# configure apt to not require confirmation (assume the -y argument by default)
+ENV DEBIAN_FRONTEND noninteractive
+RUN echo "APT::Get::Assume-Yes \"true\";" > /etc/apt/apt.conf.d/90assumeyes
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    apt-utils \
+    software-properties-common \
+    build-essential \
+    jq \
+    git \
+    python3 \
+    python3-dev \
+    python3-pip && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN add-apt-repository universe \
+    && add-apt-repository multiverse \
+    && apt update
+
+RUN pip3 install --upgrade \
+    setuptools \
+    pip
+
+ADD requirements.txt /requirements.txt
+ADD azrequirements.txt /azrequirements.txt
+
+RUN pip3 install --upgrade -r /requirements.txt
+RUN pip3 install --upgrade -r /azrequirements.txt
+
+RUN ln -s /usr/bin/python3 /usr/bin/python \
     # Create a non-root user to use if preferred - see https://aka.ms/vscode-remote/containers/non-root-user.
     && groupadd --gid $USER_GID $USERNAME \
     && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME \
     # [Optional] Add sudo support for the non-root user
-    && apt-get install -y sudo \
+    && apt-get install sudo \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME\
     && chmod 0440 /etc/sudoers.d/$USERNAME \
     #
     # Clean up
-    && apt-get autoremove -y \
-    && apt-get clean -y \
+    && apt-get autoremove \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 
